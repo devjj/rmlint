@@ -12,7 +12,10 @@ set -eu
 REPO_ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 ENGINE=${CONTAINER_ENGINE:-podman}
 
+# Pass RUN_TESTS=1 through to run the behavioural suite against the static
+# binary inside the container (CI does this).
 exec "$ENGINE" run --rm \
+    -e RUN_TESTS="${RUN_TESTS:-0}" \
     -v "$REPO_ROOT":/src:Z \
     -w /src \
     alpine:latest \

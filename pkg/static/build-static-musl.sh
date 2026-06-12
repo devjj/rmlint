@@ -28,6 +28,7 @@ apk add -q \
     gettext-dev \
     linux-headers \
     meson samurai \
+    py3-sphinx \
     curl
 
 # json-glib ships shared-only in Alpine, so build a static archive from source
@@ -111,4 +112,46 @@ printf 'the same bytes\n' > "$T/b.txt"
 printf 'unique\n'         > "$T/c.txt"
 ./rmlint.static "$T" --no-followlinks 2>&1 | grep -iE "duplicate|b.txt" || true
 rm -rf "$T"
+
+# ---------------------------------------------------------------------------
+# Optional: run the full behavioural test suite against the static binary.
+#
+# Enabled with RUN_TESTS=1 (CI sets this). The pytest harness shells out to
+# ./rmlint, which IS the static binary we just built, so the existing ~40 test
+# files double as static-build coverage -- they prove every feature actually
+# works when statically linked, not merely that the binary links.
+#
+# Tests that fundamentally cannot run in a rootless container are deselected
+# and logged (no silent skips):
+#   - test_mount_binds      need `mount --bind`        (CAP_SYS_ADMIN)
+#   - test_xattr_detail     mounts a fresh ext4 image  (CAP_SYS_ADMIN)
+# These are environment limits, not static-link failures; run the suite on a
+# privileged host to cover them too.
+# ---------------------------------------------------------------------------
+if [ "${RUN_TESTS:-0}" = "1" ]; then
+    echo ">>> Installing test dependencies"
+    # shadow -> useradd/groupadd for test_baduids; attr -> xattr CLI;
+    # mandoc provides `man` so --show-man (test_man) can render the manpage
+    # that the build produced via sphinx; py3-* avoid building wheels on musl.
+    apk add -q python3 py3-pip py3-psutil shadow attr mandoc bash dash coreutils findutils
+
+    python3 -m venv /tmp/rm-venv
+    # shellcheck disable=SC1091
+    . /tmp/rm-venv/bin/activate
+    pip install -q --disable-pip-version-check -r tests/requirements.txt
+
+    echo ">>> Running the test suite against the static binary"
+    # RM_TS_PEDANTIC=0 matches CI (skips the all-checksums cross-check that
+    # multiplies runtime). Deselect only the CAP_SYS_ADMIN tests above.
+    export RM_TS_PEDANTIC=0
+    export RM_TS_DIR=/tmp/rmlint-unit-testdir
+    echo "    (deselected: test_mount_binds, test_xattr_detail -- need mount privileges)"
+    python -m pytest -m "not slow" -q -p no:cacheprovider \
+        --deselect tests/test_options/test_merge_directories.py::test_mount_binds \
+        --deselect tests/test_robustness/test_path_doubles.py::test_mount_binds \
+        --deselect "tests/test_options/test_cache.py::test_xattr_detail[]" \
+        --deselect "tests/test_options/test_cache.py::test_xattr_detail[-D]"
+    echo ">>> Test suite passed against the static binary"
+fi
+
 echo ">>> Done. Binary: $(pwd)/rmlint.static"
