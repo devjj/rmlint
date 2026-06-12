@@ -36,3 +36,4 @@ uninstall-
 
 # JetBrains' IDE
 .idea
+rmlint.static
