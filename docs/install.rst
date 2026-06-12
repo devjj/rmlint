@@ -203,6 +203,24 @@ Uninstall with ``sudo scons uninstall`` and clean with ``scons -c``.
 You can also only type the ``install`` command above. The buildsystem is clever
 enough to figure out which targets need to be built beforehand.
 
+Portable static binary
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+If you want a single self-contained executable that you can copy to other
+machines without installing any dependencies, you can build a fully static
+binary against musl libc. This needs only a container engine (``podman`` or
+``docker``) on the build host; everything else is built inside an Alpine
+container:
+
+.. code-block:: bash
+
+   $ ./pkg/static/build-static-musl.podman.sh        # produces ./rmlint.static
+
+The resulting ``rmlint.static`` is a statically linked x86-64 executable
+(``ldd`` reports ``not a dynamic executable``) with all optional features
+enabled. It runs on any Linux kernel regardless of the target's libc. See
+``pkg/static/README.md`` for details.
+
 Troubleshooting
 ---------------
 

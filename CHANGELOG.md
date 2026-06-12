@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 The format follows [keepachangelog.com]. Please stick to it.
 
+## [Unreleased]
+
+### Added
+- Fully static `musl` build (`pkg/static/`) producing a portable, dependency-free single-binary `rmlint`, built and tested against the behavioural suite in CI.
+
 ## [2.10.3 Ludicrous Lemur] - 2025-03-22
 
 ### Added
