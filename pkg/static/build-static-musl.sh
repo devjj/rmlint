@@ -11,6 +11,18 @@
 # gettext (translations), fiemap, xattr, btrfs/clone support.
 set -eu
 
+# This is the INNER script: it must run inside the Alpine container, not on the
+# host. Running it directly on a non-Alpine host fails later with a cryptic
+# "apk: not found". Detect that early and point at the wrapper instead.
+if [ ! -f /etc/alpine-release ]; then
+    echo "error: build-static-musl.sh runs *inside* an Alpine container, not on the host." >&2
+    echo "       Run the wrapper instead, from the repo root:" >&2
+    echo "           ./pkg/static/build-static-musl.podman.sh            # build" >&2
+    echo "           RUN_TESTS=1 ./pkg/static/build-static-musl.podman.sh  # build + test" >&2
+    echo "       (set CONTAINER_ENGINE=docker to use docker instead of podman)" >&2
+    exit 1
+fi
+
 PREFIX=/usr/local
 JSON_GLIB_VER=1.10.8
 
