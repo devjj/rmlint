@@ -24,7 +24,12 @@ if [ ! -f /etc/alpine-release ]; then
 fi
 
 PREFIX=/usr/local
+# json-glib has no static archive in Alpine, so we build one from source.
+# Pinned for a reproducible build; bump deliberately. Keep this matched to the
+# json-glib-dev version Alpine ships (the headers/.pc used to compile rmlint)
+# to avoid an ABI mismatch between the static archive and the build's includes.
 JSON_GLIB_VER=1.10.8
+JSON_GLIB_SERIES=1.10  # download.gnome.org groups tarballs by major.minor
 
 echo ">>> Installing build dependencies"
 apk update -q
@@ -49,7 +54,7 @@ apk add -q \
 if [ ! -f "$PREFIX/lib/libjson-glib-1.0.a" ]; then
     echo ">>> Building json-glib $JSON_GLIB_VER as a static library"
     cd /tmp
-    curl -fsSL "https://download.gnome.org/sources/json-glib/1.10/json-glib-${JSON_GLIB_VER}.tar.xz" -o json-glib.tar.xz
+    curl -fsSL "https://download.gnome.org/sources/json-glib/${JSON_GLIB_SERIES}/json-glib-${JSON_GLIB_VER}.tar.xz" -o json-glib.tar.xz
     tar xf json-glib.tar.xz
     cd "json-glib-${JSON_GLIB_VER}"
     meson setup _build \
@@ -68,7 +73,7 @@ echo ">>> Patching blkid/mount .pc files for their static libeconf dependency"
 # Alpine's static libblkid.a / libmount.a reference libeconf (econf_*), but the
 # stock blkid.pc / mount.pc do not list it in Libs.private. Add it so the static
 # pkg-config closure places -leconf after -lblkid/-lmount on the link line.
-for pc in $(find / -name blkid.pc -o -name mount.pc 2>/dev/null); do
+find / \( -name blkid.pc -o -name mount.pc \) 2>/dev/null | while IFS= read -r pc; do
     if ! grep -q -- '-leconf' "$pc"; then
         if grep -q '^Libs.private:' "$pc"; then
             sed -i 's/^\(Libs.private:.*\)$/\1 -leconf/' "$pc"
