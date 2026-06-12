@@ -1,0 +1,44 @@
+name: Static musl build
+
+# Build the fully-static, dependency-free rmlint binary against musl libc in an
+# Alpine container, and run the behavioural test suite against it. This guards
+# the static build (pkg/static/build-static-musl.sh) from regressing and makes a
+# portable single-file binary available as a downloadable artifact.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  push:
+    branches:
+      - master
+
+jobs:
+  static-musl-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: "Build static musl rmlint and run the test suite against it"
+        # GitHub runners ship docker; the wrapper honours CONTAINER_ENGINE.
+        # RUN_TESTS=1 runs the existing pytest suite against the static binary
+        # inside the container (see pkg/static/build-static-musl.sh).
+        env:
+          CONTAINER_ENGINE: docker
+          RUN_TESTS: "1"
+        run: ./pkg/static/build-static-musl.podman.sh
+
+      - name: "Confirm the binary is statically linked"
+        run: |
+          file ./rmlint.static
+          file ./rmlint.static | grep -q "statically linked"
+          # ldd must refuse it: a static binary has no dynamic dependencies.
+          ! ldd ./rmlint.static 2>/dev/null
+
+      - name: "Upload the portable binary"
+        uses: actions/upload-artifact@v4
+        with:
+          name: rmlint-static-x86_64
+          path: rmlint.static
+          if-no-files-found: error
